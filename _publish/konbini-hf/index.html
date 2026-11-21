@@ -1,0 +1,250 @@
+<title>コンビニのレジ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;
+  --bg:#14161c; --panel:rgba(22,24,32,.86); --panel-solid:#1d2029; --ink:#f4f1ea; --muted:#b9b4a8;
+  --accent:#8fd3b6; --accent-ink:#0f2a20; --cashier:#9cc8ff; --customer:#ffc98f; --line:rgba(255,255,255,.12);
+  --jp:"Noto Sans JP","Hiragino Sans",system-ui,sans-serif; --th:"Noto Sans Thai","Thonburi",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--th);overflow:hidden}
+#stage{position:relative;height:100%;max-width:calc(100dvh * 9 / 16);margin:0 auto;background:#000;overflow:hidden}
+#stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .12s}
+#stage video.on{opacity:1}
+.jp{font-family:var(--jp)}
+.ro{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.8em;color:var(--muted);letter-spacing:.01em}
+.th{font-size:1.06em;color:#e4dfd4;line-height:1.45}
+body:not(.show-ro) .ro{display:none} body:not(.show-th) .th{display:none}
+
+/* top bar */
+#top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:max(10px,env(safe-area-inset-top)) 14px 10px;z-index:5;
+  background:linear-gradient(rgba(0,0,0,.55),transparent)}
+#title{font-size:13px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dots{display:flex;gap:5px}
+#dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.25)}
+#dots i.done{background:var(--accent)} #dots i.now{background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.2)}
+.tog{font:600 11px var(--th);color:var(--ink);background:rgba(255,255,255,.12);border:1px solid var(--line);border-radius:999px;padding:4px 9px;cursor:pointer}
+.tog[aria-pressed=false]{opacity:.45}
+
+/* subtitles */
+#sub{position:absolute;left:12px;right:12px;bottom:max(18px,env(safe-area-inset-bottom));z-index:4;text-align:center;pointer-events:none;transition:opacity .15s}
+#sub .card{display:inline-block;background:var(--panel);backdrop-filter:blur(6px);border-radius:14px;padding:8px 14px 9px;max-width:100%}
+#sub .who{font-size:11px;font-weight:600;letter-spacing:.04em;margin-bottom:2px}
+#sub .jp{font-size:clamp(17px,5vw,22px);font-weight:500;line-height:1.35}
+#sub .th{display:block;font-size:clamp(18px,5.2vw,22px);font-weight:500;margin-top:2px}
+#sub.cashier .who{color:var(--cashier)} #sub.customer .who{color:var(--customer)}
+
+/* sheets */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;padding:16px 14px max(16px,env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(10,11,15,.92) 18%);transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.sheet.open{transform:none}
+.bubble{background:var(--panel-solid);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;position:relative}
+.bubble .who{font-size:11px;font-weight:600;color:var(--cashier);margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.bubble .jp{font-size:clamp(18px,5.4vw,23px);font-weight:700;line-height:1.35}
+.bubble .ro,.bubble .th{display:block}.bubble .th{font-size:clamp(18px,5.2vw,21px);font-weight:500;margin-top:2px}
+.again{font:600 11px var(--th);background:none;border:1px solid var(--line);color:var(--cashier);border-radius:999px;padding:3px 9px;cursor:pointer}
+.hint{font-size:12px;color:var(--muted);margin:0 2px 8px}
+.opts{display:grid;gap:8px}
+.opt{display:block;width:100%;text-align:left;background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--ink);border-radius:14px;padding:10px 14px;cursor:pointer;font-family:var(--th);transition:background .12s,transform .08s}
+.opt:hover{background:rgba(143,211,182,.14);border-color:rgba(143,211,182,.5)} .opt:active{transform:scale(.985)}
+.opt .jp{font-size:17px;font-weight:500;display:block} .opt .ro,.opt .th{display:block;margin-top:1px} .opt .th{font-size:17px}
+body:not(.show-ro) .opt .ro,body:not(.show-th) .opt .th{display:none}
+.opt .k{float:right;font:600 11px var(--th);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-left:8px}
+
+.go{width:100%;border:0;border-radius:14px;padding:13px;background:var(--accent);color:var(--accent-ink);font:700 16px var(--th);cursor:pointer}
+.go.ghost{background:rgba(255,255,255,.1);color:var(--ink);margin-top:8px}
+
+/* start + end */
+.screen{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 18px max(22px,env(safe-area-inset-bottom));
+  background:linear-gradient(rgba(10,11,15,.15),rgba(10,11,15,.95) 55%)}
+.screen[hidden]{display:none}
+.screen h1{font:700 30px var(--jp);margin:0 0 4px} .screen h2{font:500 16px var(--th);color:var(--muted);margin:0 0 14px}
+.screen p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 16px}
+#poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;filter:saturate(.9)}
+#log{max-height:52dvh;overflow:auto;margin-bottom:14px;display:grid;gap:6px}
+#log .row{padding:7px 11px;border-radius:12px;background:rgba(255,255,255,.06);border-left:3px solid var(--cashier)}
+#log .row.customer{border-left-color:var(--customer);background:rgba(255,201,143,.1)}
+#log .jp{font-size:15px} #log .ro,#log .th{display:block} #log .th{font-size:16px}
+#loading{position:absolute;inset:0;display:grid;place-items:center;z-index:3;color:var(--muted);font-size:13px;pointer-events:none}
+</style>
+<script>window.SCENARIOS=window.SCENARIOS||{};window.SCENARIOS['konbini-hf']={"intro": {"clip": "intro", "lines": [{"who": "cashier", "jp": "いらっしゃいませ。", "romaji": "Irasshaimase.", "th": "ยินดีต้อนรับครับ"}], "ends_with": "q1"}, "questions": [{"id": "q1", "cashier": {"jp": "ポイントカードはお持ちですか？", "romaji": "Pointo kādo wa o-mochi desu ka?", "th": "มีบัตรสะสมแต้มไหมครับ"}, "next": "q2", "options": [{"clip": "q1_no", "answer": {"jp": "いいえ、持っていません。", "romaji": "Iie, motte imasen.", "th": "ไม่มีค่ะ"}, "pattern": {"jp": "〜は持っていません", "romaji": "~ wa motte imasen", "th": "ไม่มี ~ (ไม่ได้พกมา)"}, "note": "ตอบสั้น ๆ แบบเป็นกันเองว่า 「ないです」 (Nai desu) ก็ได้", "lines": [{"who": "customer", "jp": "いいえ、持っていません。", "romaji": "Iie, motte imasen.", "th": "ไม่มีค่ะ"}, {"who": "cashier", "jp": "かしこまりました。", "romaji": "Kashikomarimashita.", "th": "รับทราบครับ"}, {"who": "cashier", "jp": "こちらのお弁当、温めますか？", "romaji": "Kochira no o-bentō, atatamemasu ka?", "th": "ข้าวกล่องนี้ อุ่นไหมครับ", "question": true}]}, {"clip": "q1_app", "answer": {"jp": "はい、アプリでお願いします。", "romaji": "Hai, apuri de onegaishimasu.", "th": "มีค่ะ ใช้ในแอปนะคะ"}, "pattern": {"jp": "[วิธี]でお願いします", "romaji": "[...] de onegaishimasu", "th": "ขอใช้ [วิธี] ค่ะ"}, "note": "で บอก 'วิธี/เครื่องมือ' ที่ใช้ — ใช้ซ้ำได้ตอนเลือกวิธีจ่ายเงินด้วย", "lines": [{"who": "customer", "jp": "はい、アプリでお願いします。", "romaji": "Hai, apuri de onegaishimasu.", "th": "มีค่ะ ใช้ในแอปนะคะ"}, {"who": "cashier", "jp": "ありがとうございます。", "romaji": "Arigatō gozaimasu.", "th": "ขอบคุณครับ"}, {"who": "cashier", "jp": "こちらのお弁当、温めますか？", "romaji": "Kochira no o-bentō, atatamemasu ka?", "th": "ข้าวกล่องนี้ อุ่นไหมครับ", "question": true}]}]}, {"id": "q2", "cashier": {"jp": "こちらのお弁当、温めますか？", "romaji": "Kochira no o-bentō, atatamemasu ka?", "th": "ข้าวกล่องนี้ อุ่นไหมครับ"}, "next": "q3", "options": [{"clip": "q2_yes", "answer": {"jp": "はい、お願いします。", "romaji": "Hai, onegaishimasu.", "th": "ค่ะ รบกวนด้วยค่ะ"}, "pattern": {"jp": "はい、お願いします", "romaji": "Hai, onegaishimasu", "th": "ค่ะ รบกวนด้วย (ตอบรับข้อเสนอ)"}, "note": "ประโยคสารพัดประโยชน์ที่สุดในคอมบินิ — พนักงานเสนออะไรมา ตอบรับด้วยประโยคนี้ได้หมด", "lines": [{"who": "customer", "jp": "はい、お願いします。", "romaji": "Hai, onegaishimasu.", "th": "ค่ะ รบกวนด้วยค่ะ"}, {"who": "cashier", "jp": "かしこまりました。", "romaji": "Kashikomarimashita.", "th": "รับทราบครับ"}, {"who": "cashier", "jp": "お箸はおつけしますか？", "romaji": "O-hashi wa o-tsuke shimasu ka?", "th": "รับตะเกียบไหมครับ", "question": true}], "sets": {"warm": true}}, {"clip": "q2_no", "answer": {"jp": "いいえ、そのままで大丈夫です。", "romaji": "Iie, sono mama de daijōbu desu.", "th": "ไม่เป็นไรค่ะ เอาแบบนั้นเลย"}, "pattern": {"jp": "そのままで大丈夫です", "romaji": "Sono mama de daijōbu desu", "th": "แบบนั้นเลยก็ได้ค่ะ (ไม่ต้องทำอะไรเพิ่ม)"}, "note": "大丈夫です (daijōbu desu) = ปฏิเสธอย่างสุภาพ แปลตรงตัวว่า 'ไม่เป็นไร'", "lines": [{"who": "customer", "jp": "いいえ、そのままで大丈夫です。", "romaji": "Iie, sono mama de daijōbu desu.", "th": "ไม่เป็นไรค่ะ เอาแบบนั้นเลย"}, {"who": "cashier", "jp": "かしこまりました。", "romaji": "Kashikomarimashita.", "th": "รับทราบครับ"}, {"who": "cashier", "jp": "お箸はおつけしますか？", "romaji": "O-hashi wa o-tsuke shimasu ka?", "th": "รับตะเกียบไหมครับ", "question": true}], "sets": {"warm": false}}]}, {"id": "q3", "cashier": {"jp": "お箸はおつけしますか？", "romaji": "O-hashi wa o-tsuke shimasu ka?", "th": "รับตะเกียบไหมครับ"}, "next": "q4", "options": [{"clip": "q3_one", "answer": {"jp": "はい、お願いします。", "romaji": "Hai, onegaishimasu.", "th": "ค่ะ ขอด้วยค่ะ"}, "pattern": {"jp": "はい、お願いします", "romaji": "Hai, onegaishimasu", "th": "ค่ะ ขอด้วยค่ะ"}, "note": "ได้ตะเกียบ 1 คู่ — ประโยคเดียวกับข้อที่แล้ว ใช้ได้ทุกครั้งที่ตอบรับ", "lines": [{"who": "customer", "jp": "はい、お願いします。", "romaji": "Hai, onegaishimasu.", "th": "ค่ะ ขอด้วยค่ะ"}, {"who": "cashier", "jp": "お一つですね。", "romaji": "O-hitotsu desu ne.", "th": "หนึ่งคู่นะครับ"}, {"who": "cashier", "jp": "袋はご利用ですか？", "romaji": "Fukuro wa go-riyō desu ka?", "th": "รับถุงไหมครับ", "question": true}]}, {"clip": "q3_two", "answer": {"jp": "二つお願いします。", "romaji": "Futatsu onegaishimasu.", "th": "ขอสองคู่ค่ะ"}, "pattern": {"jp": "[จำนวน] お願いします", "romaji": "[hitotsu / futatsu ...] onegaishimasu", "th": "ขอ [จำนวน] ค่ะ"}, "note": "ลักษณนามของตะเกียบจริง ๆ คือ 膳 (zen): 一膳 ichizen, 二膳 nizen — แต่ 一つ/二つ ใช้ได้และเข้าใจทุกที่", "lines": [{"who": "customer", "jp": "二つお願いします。", "romaji": "Futatsu onegaishimasu.", "th": "ขอสองคู่ค่ะ"}, {"who": "cashier", "jp": "お二つですね。", "romaji": "O-futatsu desu ne.", "th": "สองคู่นะครับ"}, {"who": "cashier", "jp": "袋はご利用ですか？", "romaji": "Fukuro wa go-riyō desu ka?", "th": "รับถุงไหมครับ", "question": true}]}, {"clip": "q3_none", "answer": {"jp": "いいえ、大丈夫です。", "romaji": "Iie, daijōbu desu.", "th": "ไม่เป็นไรค่ะ"}, "pattern": {"jp": "いいえ、大丈夫です", "romaji": "Iie, daijōbu desu", "th": "ไม่เป็นไรค่ะ (ไม่รับ)"}, "note": "ปฏิเสธอะไรก็ได้ในร้าน: ตะเกียบ ช้อน ถุง ใบเสร็จ", "lines": [{"who": "customer", "jp": "いいえ、大丈夫です。", "romaji": "Iie, daijōbu desu.", "th": "ไม่เป็นไรค่ะ"}, {"who": "cashier", "jp": "かしこまりました。", "romaji": "Kashikomarimashita.", "th": "รับทราบครับ"}, {"who": "cashier", "jp": "袋はご利用ですか？", "romaji": "Fukuro wa go-riyō desu ka?", "th": "รับถุงไหมครับ", "question": true}]}]}, {"id": "q4", "cashier": {"jp": "袋はご利用ですか？", "romaji": "Fukuro wa go-riyō desu ka?", "th": "รับถุงไหมครับ"}, "next": "q5", "options": [{"clip": "q4_bag", "answer": {"jp": "はい、お願いします。", "romaji": "Hai, onegaishimasu.", "th": "ค่ะ ขอถุงด้วยค่ะ"}, "pattern": {"jp": "はい、お願いします", "romaji": "Hai, onegaishimasu", "th": "ค่ะ ขอถุงด้วย"}, "note": "ถุงพลาสติกในญี่ปุ่นต้องจ่ายเงิน (レジ袋 rejibukuro) ราว 3–5 เยน", "lines": [{"who": "customer", "jp": "はい、お願いします。", "romaji": "Hai, onegaishimasu.", "th": "ค่ะ ขอถุงด้วยค่ะ"}, {"who": "cashier", "jp": "袋、三円いただきます。", "romaji": "Fukuro, san-en itadakimasu.", "th": "ค่าถุง 3 เยนนะครับ"}, {"who": "cashier", "jp": "お支払いはどうなさいますか？", "romaji": "O-shiharai wa dō nasaimasu ka?", "th": "ชำระเงินแบบไหนดีครับ", "question": true}]}, {"clip": "q4_nobag", "answer": {"jp": "いいえ、大丈夫です。", "romaji": "Iie, daijōbu desu.", "th": "ไม่เป็นไรค่ะ"}, "pattern": {"jp": "いいえ、大丈夫です", "romaji": "Iie, daijōbu desu", "th": "ไม่เป็นไรค่ะ (ไม่รับถุง)"}, "note": "ถ้าไม่รับถุง พนักงานจะติดเทป/สติกเกอร์ไว้บนสินค้าเพื่อแสดงว่าจ่ายเงินแล้ว", "lines": [{"who": "customer", "jp": "いいえ、大丈夫です。", "romaji": "Iie, daijōbu desu.", "th": "ไม่เป็นไรค่ะ"}, {"who": "cashier", "jp": "シールで失礼します。", "romaji": "Shīru de shitsurei shimasu.", "th": "ขออนุญาตติดสติกเกอร์แทนนะครับ"}, {"who": "cashier", "jp": "お支払いはどうなさいますか？", "romaji": "O-shiharai wa dō nasaimasu ka?", "th": "ชำระเงินแบบไหนดีครับ", "question": true}]}, {"clip": "q4_eco", "answer": {"jp": "エコバッグがあります。", "romaji": "Eko baggu ga arimasu.", "th": "มีถุงผ้ามาค่ะ"}, "pattern": {"jp": "〜があります", "romaji": "~ ga arimasu", "th": "มี ~ ค่ะ"}, "note": "エコバッグ (eko baggu) = ถุงผ้าที่พกมาเอง — คนญี่ปุ่นพกกันเยอะมาก", "lines": [{"who": "customer", "jp": "エコバッグがあります。", "romaji": "Eko baggu ga arimasu.", "th": "มีถุงผ้ามาค่ะ"}, {"who": "cashier", "jp": "ありがとうございます。", "romaji": "Arigatō gozaimasu.", "th": "ขอบคุณครับ"}, {"who": "cashier", "jp": "お支払いはどうなさいますか？", "romaji": "O-shiharai wa dō nasaimasu ka?", "th": "ชำระเงินแบบไหนดีครับ", "question": true}]}]}, {"id": "q5", "cashier": {"jp": "お支払いはどうなさいますか？", "romaji": "O-shiharai wa dō nasaimasu ka?", "th": "ชำระเงินแบบไหนดีครับ"}, "next": "q6", "options": [{"clip": "q5_cash", "answer": {"jp": "現金でお願いします。", "romaji": "Genkin de onegaishimasu.", "th": "จ่ายเงินสดค่ะ"}, "pattern": {"jp": "[วิธีจ่าย] でお願いします", "romaji": "[genkin / kādo ...] de onegaishimasu", "th": "ขอจ่ายด้วย [วิธี] ค่ะ"}, "note": "現金 genkin = เงินสด · วางเงินในถาดเล็ก ๆ ไม่ต้องยื่นใส่มือพนักงาน", "lines": [{"who": "customer", "jp": "現金でお願いします。", "romaji": "Genkin de onegaishimasu.", "th": "จ่ายเงินสดค่ะ"}, {"who": "cashier", "jp": "千円お預かりします。", "romaji": "Sen-en o-azukari shimasu.", "th": "รับเงินมา 1,000 เยนนะครับ"}, {"who": "cashier", "jp": "お返しです。", "romaji": "O-kaeshi desu.", "th": "เงินทอนครับ"}, {"who": "cashier", "jp": "レシートはご利用ですか？", "romaji": "Reshīto wa go-riyō desu ka?", "th": "รับใบเสร็จไหมครับ", "question": true}]}, {"clip": "q5_card", "answer": {"jp": "カードでお願いします。", "romaji": "Kādo de onegaishimasu.", "th": "จ่ายด้วยบัตรค่ะ"}, "pattern": {"jp": "[วิธีจ่าย] でお願いします", "romaji": "[...] de onegaishimasu", "th": "ขอจ่ายด้วย [วิธี] ค่ะ"}, "note": "ถ้าแตะไม่ได้ พนักงานอาจบอก 「差し込んでください」 (sashikonde kudasai) = เสียบบัตร", "lines": [{"who": "customer", "jp": "カードでお願いします。", "romaji": "Kādo de onegaishimasu.", "th": "จ่ายด้วยบัตรค่ะ"}, {"who": "cashier", "jp": "こちらにカードをタッチしてください。", "romaji": "Kochira ni kādo o tatchi shite kudasai.", "th": "แตะบัตรตรงนี้เลยครับ"}, {"who": "cashier", "jp": "レシートはご利用ですか？", "romaji": "Reshīto wa go-riyō desu ka?", "th": "รับใบเสร็จไหมครับ", "question": true}]}, {"clip": "q5_suica", "answer": {"jp": "スイカでお願いします。", "romaji": "Suika de onegaishimasu.", "th": "จ่ายด้วย Suica ค่ะ"}, "pattern": {"jp": "[วิธีจ่าย] でお願いします", "romaji": "[...] de onegaishimasu", "th": "ขอจ่ายด้วย [วิธี] ค่ะ"}, "note": "ใช้กับบัตร IC อื่นได้เหมือนกัน: ICOCA, PASMO หรือพูดรวม ๆ ว่า 「交通系で」 (kōtsūkei de)", "lines": [{"who": "customer", "jp": "スイカでお願いします。", "romaji": "Suika de onegaishimasu.", "th": "จ่ายด้วย Suica ค่ะ"}, {"who": "cashier", "jp": "こちらにタッチをお願いします。", "romaji": "Kochira ni tatchi o onegaishimasu.", "th": "รบกวนแตะตรงนี้ครับ"}, {"who": "cashier", "jp": "レシートはご利用ですか？", "romaji": "Reshīto wa go-riyō desu ka?", "th": "รับใบเสร็จไหมครับ", "question": true}]}, {"clip": "q5_paypay", "answer": {"jp": "ペイペイでお願いします。", "romaji": "Peipei de onegaishimasu.", "th": "จ่ายด้วย PayPay ค่ะ"}, "pattern": {"jp": "[วิธีจ่าย] でお願いします", "romaji": "[...] de onegaishimasu", "th": "ขอจ่ายด้วย [วิธี] ค่ะ"}, "note": "จ่ายผ่านแอป QR: พนักงานจะสแกนบาร์โค้ดจากมือถือเรา", "lines": [{"who": "customer", "jp": "ペイペイでお願いします。", "romaji": "Peipei de onegaishimasu.", "th": "จ่ายด้วย PayPay ค่ะ"}, {"who": "cashier", "jp": "バーコードをお願いします。", "romaji": "Bākōdo o onegaishimasu.", "th": "ขอสแกนบาร์โค้ดด้วยครับ"}, {"who": "cashier", "jp": "レシートはご利用ですか？", "romaji": "Reshīto wa go-riyō desu ka?", "th": "รับใบเสร็จไหมครับ", "question": true}]}]}, {"id": "q6", "cashier": {"jp": "レシートはご利用ですか？", "romaji": "Reshīto wa go-riyō desu ka?", "th": "รับใบเสร็จไหมครับ"}, "next": null, "options": [{"clip": "q6_yes", "answer": {"jp": "はい、ください。", "romaji": "Hai, kudasai.", "th": "ค่ะ ขอด้วยค่ะ"}, "pattern": {"jp": "〜をください", "romaji": "~ o kudasai", "th": "ขอ ~ ค่ะ"}, "note": "ตอบแค่ 「はい、ください」 ก็พอ ไม่ต้องพูดชื่อของซ้ำ", "lines": [{"who": "customer", "jp": "はい、ください。", "romaji": "Hai, kudasai.", "th": "ค่ะ ขอด้วยค่ะ"}, {"who": "cashier", "jp": "こちら、レシートです。", "romaji": "Kochira, reshīto desu.", "th": "นี่ใบเสร็จครับ"}]}, {"clip": "q6_no", "answer": {"jp": "いいえ、大丈夫です。", "romaji": "Iie, daijōbu desu.", "th": "ไม่เป็นไรค่ะ"}, "pattern": {"jp": "いいえ、大丈夫です", "romaji": "Iie, daijōbu desu", "th": "ไม่เป็นไรค่ะ (ไม่รับ)"}, "note": "ใบเสร็จที่ไม่เอา พนักงานจะทิ้งในกล่องข้างเครื่องคิดเงินให้", "lines": [{"who": "customer", "jp": "いいえ、大丈夫です。", "romaji": "Iie, daijōbu desu.", "th": "ไม่เป็นไรค่ะ"}, {"who": "cashier", "jp": "かしこまりました。", "romaji": "Kashikomarimashita.", "th": "รับทราบครับ"}]}]}], "endings": {"warm": {"clip": "end_warm", "lines": [{"who": "cashier", "jp": "少々お待ちください。", "romaji": "Shōshō o-machi kudasai.", "th": "รอสักครู่นะครับ"}, {"who": "cashier", "jp": "お待たせしました。", "romaji": "O-matase shimashita.", "th": "ขอโทษที่ให้รอครับ"}, {"who": "cashier", "jp": "熱いのでお気をつけください。", "romaji": "Atsui no de o-ki o tsuke kudasai.", "th": "ร้อนนะครับ ระวังด้วย"}, {"who": "customer", "jp": "ありがとうございます。", "romaji": "Arigatō gozaimasu.", "th": "ขอบคุณค่ะ"}, {"who": "cashier", "jp": "ありがとうございました。またお越しくださいませ。", "romaji": "Arigatō gozaimashita. Mata o-koshi kudasaimase.", "th": "ขอบคุณมากครับ แล้วแวะมาใหม่นะครับ"}]}, "cold": {"clip": "end_cold", "lines": [{"who": "cashier", "jp": "お待たせしました。", "romaji": "O-matase shimashita.", "th": "ขอโทษที่ให้รอครับ"}, {"who": "customer", "jp": "ありがとうございます。", "romaji": "Arigatō gozaimasu.", "th": "ขอบคุณค่ะ"}, {"who": "cashier", "jp": "ありがとうございました。またお越しくださいませ。", "romaji": "Arigatō gozaimashita. Mata o-koshi kudasaimase.", "th": "ขอบคุณมากครับ แล้วแวะมาใหม่นะครับ"}]}}, "id": "konbini-hf", "title": "コンビニのレジ", "title_th": "จ่ายเงินที่ร้านสะดวกซื้อ (HyperFrames)", "durations": {"intro": 7.7667, "q1_no": 7.2333, "q1_app": 9.2, "q2_yes": 8.8667, "q2_no": 8.1, "q3_one": 6.7333, "q3_two": 7.8333, "q3_none": 7.0333, "q4_bag": 7.8667, "q4_nobag": 7.1333, "q4_eco": 7.3667, "q5_cash": 10.3333, "q5_card": 9.2333, "q5_suica": 9.4, "q5_paypay": 9.0, "q6_yes": 6.4333, "q6_no": 5.6333, "end_warm": 14.0667, "end_cold": 8.7667}, "timings": {"intro": [[0.85, 1.61], [4.89, 6.81]], "q1_no": [[0.45, 1.73], [2.36, 3.64], [4.17, 6.25]], "q1_app": [[0.55, 2.47], [4.45, 5.41], [6.14, 8.22]], "q2_yes": [[0.45, 1.73], [2.26, 3.54], [6.37, 7.89]], "q2_no": [[0.45, 2.53], [3.41, 4.69], [5.62, 7.14]], "q3_one": [[0.45, 1.73], [2.71, 3.35], [4.18, 5.78]], "q3_two": [[0.55, 1.91], [3.79, 4.43], [5.26, 6.86]], "q3_none": [[0.55, 1.83], [2.66, 3.94], [4.47, 6.07]], "q4_bag": [[0.45, 1.73], [2.41, 4.57], [5.4, 6.91]], "q4_nobag": [[0.45, 1.73], [2.46, 3.74], [4.67, 6.18]], "q4_eco": [[0.55, 1.83], [3.11, 4.07], [4.9, 6.41]], "q5_cash": [[0.55, 2.07], [3.4, 4.84], [5.92, 6.79], [7.92, 9.37]], "q5_card": [[0.55, 1.83], [2.56, 4.31], [6.84, 8.28]], "q5_suica": [[0.55, 1.99], [2.72, 4.48], [7.01, 8.45]], "q5_paypay": [[0.55, 1.99], [2.72, 4.16], [6.59, 8.03]], "q6_yes": [[0.45, 1.49], [2.77, 4.2]], "q6_no": [[0.45, 1.73], [2.71, 3.99]], "end_warm": [[0.75, 1.79], [4.22, 5.16], [5.34, 6.86], [7.49, 8.77], [9.6, 12.4]], "end_cold": [[0.65, 1.59], [2.22, 3.5], [4.33, 7.13]]}}; window.IA_SID='konbini-hf'; window.IA_BASE=''; document.body.classList.add('show-ro','show-th');</script>
+<div id="stage">
+  <div id="loading">กำลังโหลดวิดีโอ…</div>
+  <div id="top">
+    <div id="title"></div>
+    <div id="dots"></div>
+    <button class="tog" id="tRo" aria-pressed="true">Romaji</button>
+    <button class="tog" id="tTh" aria-pressed="true">ไทย</button>
+  </div>
+  <div id="sub" style="opacity:0"><div class="card"><div class="who"></div><div class="jp"></div><div class="ro"></div><div class="th"></div></div></div>
+
+  <div class="sheet" id="ask">
+    <div class="bubble"><div class="who"><span>พนักงาน</span><button class="again" id="again">↻ ฟังอีกครั้ง</button></div>
+      <div class="jp" id="qJp"></div><div class="ro" id="qRo"></div><div class="th" id="qTh"></div></div>
+    <div class="hint">เลือกคำตอบของคุณ</div>
+    <div class="opts" id="opts"></div>
+  </div>
+
+  <div class="screen" id="start">
+    <img id="poster" alt="">
+    <h1 id="sTitle"></h1><h2 id="sSub"></h2>
+    <p>พนักงานจะถามทีละคำถาม วิดีโอจะหยุดรอให้คุณเลือกคำตอบ แล้วพนักงานจะทำตามที่คุณตอบ ลองเล่นซ้ำแล้วตอบแบบอื่นดูได้</p>
+    <button class="go" id="goStart">▶ เริ่ม</button>
+  </div>
+  <div class="screen" id="end" hidden>
+    <h1>おつかれさま！</h1><h2>บทสนทนาของคุณ</h2>
+    <div id="log"></div>
+    <button class="go" id="goAgain">↻ เล่นอีกครั้ง (ลองตอบแบบอื่น)</button>
+  </div>
+</div>
+
+<script>
+const sid = window.IA_SID || new URLSearchParams(location.search).get('s') || 'konbini';
+const base = window.IA_BASE ?? (sid + '/');
+if (window.SCENARIOS && window.SCENARIOS[sid]) init(window.SCENARIOS[sid]);   // scenario inlined (published copy)
+else {
+  const s = document.createElement('script');
+  s.src = base + 'scenario.js';
+  s.onload = () => init(window.SCENARIOS[sid]);
+  s.onerror = () => document.getElementById('loading').textContent = 'ไม่พบ ' + base + 'scenario.js';
+  document.head.appendChild(s);
+}
+
+function init(S){
+  const $ = id => document.getElementById(id);
+  const stage = $('stage');
+  const vids = {};            // clip id -> <video>
+  let cur = null, state = {}, log = [], qIndex = 0, subLines = [], subTimer = 0, questionStart = null;
+
+  document.title = S.title + ' · ' + S.title_th;
+  $('title').textContent = S.title + ' · ' + S.title_th;
+  $('sTitle').textContent = S.title; $('sSub').textContent = S.title_th;
+  $('poster').src = base + 'clips/hub.jpg';
+  $('dots').innerHTML = S.questions.map(() => '<i></i>').join('');
+
+  const pref = (k, d) => { try { const v = localStorage.getItem('ia.' + k); return v === null ? d : v === '1'; } catch(e){ return d; } };
+  const setPref = (k, v) => { try { localStorage.setItem('ia.' + k, v ? '1' : '0'); } catch(e){} };
+  function tog(btn, cls, key){
+    const apply = on => { document.body.classList.toggle(cls, on); btn.setAttribute('aria-pressed', on); };
+    apply(pref(key, true));
+    btn.onclick = () => { const on = !document.body.classList.contains(cls); apply(on); setPref(key, on); };
+  }
+  tog($('tRo'), 'show-ro', 'ro'); tog($('tTh'), 'show-th', 'th');
+
+  function video(clip){
+    if (vids[clip]) return vids[clip];
+    const v = document.createElement('video');
+    v.src = base + 'clips/' + clip + '.mp4'; v.preload = 'auto'; v.playsInline = true;
+    v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    stage.insertBefore(v, $('loading'));
+    vids[clip] = v; return v;
+  }
+  const preload = clips => clips.forEach(c => { const v = video(c); if (v.readyState < 2) v.load(); });
+
+  function playClip(clip, lines, onEnd){
+    const v = video(clip);
+    const T = (S.timings && S.timings[clip]) || null;
+    subLines = lines.map((l, i) => Object.assign({}, l, T && T[i] ? {t0:T[i][0], t1:T[i][1]} : spread(lines, i, S.durations[clip])));
+    questionStart = (subLines.find(l => l.question) || {}).t0 ?? null;
+    v.currentTime = 0;
+    const show = () => { Object.values(vids).forEach(x => x.classList.toggle('on', x === v)); if (cur && cur !== v) cur.pause(); cur = v; };
+    v.onended = () => { hideSub(); onEnd && onEnd(); };
+    const p = v.play();
+    $('loading').style.opacity = v.readyState >= 2 ? 0 : 1;
+    v.onplaying = () => { $('loading').style.opacity = 0; show(); };
+    if (p && p.catch) p.catch(() => { show(); });
+    tickSubs();
+  }
+  function spread(lines, i, dur){ const n = lines.length, w = dur / n; return {t0: i*w + .2, t1: (i+1)*w - .1}; }
+  function tickSubs(){
+    cancelAnimationFrame(subTimer);
+    const step = () => {
+      if (!cur) return;
+      const t = cur.currentTime;
+      const l = subLines.find(l => t >= l.t0 && t <= l.t1 + .35);
+      if (l) showSub(l); else hideSub();
+      if (!cur.paused && !cur.ended) subTimer = requestAnimationFrame(step);
+    };
+    subTimer = requestAnimationFrame(step);
+  }
+  let shown = null;
+  function showSub(l){
+    const el = $('sub'); el.style.opacity = 1;
+    if (shown === l) return; shown = l;
+    el.className = l.who;
+    el.querySelector('.who').textContent = l.who === 'customer' ? 'คุณ' : 'พนักงาน';
+    el.querySelector('.jp').textContent = l.jp; el.querySelector('.ro').textContent = l.romaji; el.querySelector('.th').textContent = l.th;
+  }
+  function hideSub(){ $('sub').style.opacity = 0; shown = null; }
+
+  function dots(){ [...$('dots').children].forEach((d, i) => d.className = i < qIndex ? 'done' : i === qIndex ? 'now' : ''); }
+
+  function ask(){
+    const q = S.questions[qIndex]; dots();
+    $('qJp').textContent = q.cashier.jp; $('qRo').textContent = q.cashier.romaji; $('qTh').textContent = q.cashier.th;
+    $('opts').innerHTML = '';
+    q.options.forEach((o, i) => {
+      const b = document.createElement('button'); b.className = 'opt';
+      b.innerHTML = `<span class="k">${i+1}</span><span class="jp"></span><span class="ro"></span><span class="th"></span>`;
+      b.querySelector('.jp').textContent = o.answer.jp; b.querySelector('.ro').textContent = o.answer.romaji; b.querySelector('.th').textContent = o.answer.th;
+      b.onclick = () => choose(q, o);
+      $('opts').appendChild(b);
+    });
+    preload(q.options.map(o => o.clip));
+    $('ask').classList.add('open');
+  }
+  $('again').onclick = () => {
+    if (!cur || questionStart === null) return;
+    $('ask').classList.remove('open');
+    cur.currentTime = Math.max(0, questionStart - .3); cur.play(); tickSubs();
+  };
+
+  function choose(q, o){
+    $('ask').classList.remove('open');
+    log.push({who:'cashier', ...q.cashier});
+    Object.assign(state, o.sets || {});
+    o.lines.filter(l => !l.question).forEach(l => log.push(l));
+    qIndex++;
+    const next = q.next;
+    if (next) preload(S.questions[qIndex].options.map(x => x.clip));
+    else {   // iOS only lets a video play with sound if a tap started it: unlock the ending now, inside this tap
+      preload([endingClip()]);
+      const ev = video(endingClip()), p = ev.play();
+      if (p && p.then) p.then(() => { ev.pause(); ev.currentTime = 0; }).catch(() => {});
+    }
+    playClip(o.clip, o.lines, () => next ? ask() : ending());
+  }
+
+  function endingClip(){ return (state.warm ? S.endings.warm : S.endings.cold).clip; }
+  function ending(){
+    dots();
+    const e = state.warm ? S.endings.warm : S.endings.cold;
+    playClip(e.clip, e.lines, () => { e.lines.forEach(l => log.push(l)); showLog(); });
+  }
+  function showLog(){
+    $('log').innerHTML = '';
+    log.forEach(l => {
+      const r = document.createElement('div'); r.className = 'row ' + l.who;
+      r.innerHTML = '<span class="jp"></span><span class="ro"></span><span class="th"></span>';
+      r.querySelector('.jp').textContent = l.jp; r.querySelector('.ro').textContent = l.romaji; r.querySelector('.th').textContent = l.th;
+      $('log').appendChild(r);
+    });
+    $('end').hidden = false;
+  }
+
+  function begin(){
+    $('start').hidden = true; $('end').hidden = true;
+    state = {}; log = []; qIndex = 0; dots();
+    log.push(...S.intro.lines);
+    preload(S.questions[0].options.map(o => o.clip));
+    playClip(S.intro.clip, S.intro.lines.concat([{who:'cashier', ...S.questions[0].cashier, question:true}]), ask);
+  }
+  video(S.intro.clip);
+  $('goStart').onclick = begin; $('goAgain').onclick = begin;
+
+  document.addEventListener('keydown', e => {
+    if ($('ask').classList.contains('open')) { const b = $('opts').children[+e.key - 1]; if (b) b.click(); }
+  });
+}
+</script>

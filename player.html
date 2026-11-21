@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ตอบให้ทัน · Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14161c; --panel:rgba(22,24,32,.86); --panel-solid:#1d2029; --ink:#f4f1ea; --muted:#b9b4a8;
+  --accent:#8fd3b6; --accent-ink:#0f2a20; --cashier:#9cc8ff; --customer:#ffc98f; --line:rgba(255,255,255,.12);
+  --jp:"Noto Sans JP","Hiragino Sans",system-ui,sans-serif; --th:"Noto Sans Thai","Thonburi",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--th);overflow:hidden}
+#stage{position:relative;height:100dvh;max-width:calc(100dvh * 9 / 16);margin:0 auto;background:#000;overflow:hidden}
+#stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .12s}
+#stage video.on{opacity:1}
+.jp{font-family:var(--jp)}
+.ro{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.8em;color:var(--muted);letter-spacing:.01em}
+.th{font-size:1.06em;color:#e4dfd4;line-height:1.45}
+body:not(.show-ro) .ro{display:none} body:not(.show-th) .th{display:none}
+
+/* top bar */
+#top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:max(10px,env(safe-area-inset-top)) 14px 10px;z-index:5;
+  background:linear-gradient(rgba(0,0,0,.55),transparent)}
+#title{font-size:13px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dots{display:flex;gap:5px}
+#dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.25)}
+#dots i.done{background:var(--accent)} #dots i.now{background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.2)}
+.tog{font:600 11px var(--th);color:var(--ink);background:rgba(255,255,255,.12);border:1px solid var(--line);border-radius:999px;padding:4px 9px;cursor:pointer}
+.tog[aria-pressed=false]{opacity:.45}
+
+/* subtitles */
+#sub{position:absolute;left:12px;right:12px;bottom:max(18px,env(safe-area-inset-bottom));z-index:4;text-align:center;pointer-events:none;transition:opacity .15s}
+#sub .card{display:inline-block;background:var(--panel);backdrop-filter:blur(6px);border-radius:14px;padding:8px 14px 9px;max-width:100%}
+#sub .who{font-size:11px;font-weight:600;letter-spacing:.04em;margin-bottom:2px}
+#sub .jp{font-size:clamp(17px,5vw,22px);font-weight:500;line-height:1.35}
+#sub .th{display:block;font-size:clamp(18px,5.2vw,22px);font-weight:500;margin-top:2px}
+#sub.cashier .who{color:var(--cashier)} #sub.customer .who{color:var(--customer)}
+
+/* sheets */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;padding:16px 14px max(16px,env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(10,11,15,.92) 18%);transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.sheet.open{transform:none}
+.bubble{background:var(--panel-solid);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;position:relative}
+.bubble .who{font-size:11px;font-weight:600;color:var(--cashier);margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.bubble .jp{font-size:clamp(18px,5.4vw,23px);font-weight:700;line-height:1.35}
+.bubble .ro,.bubble .th{display:block}.bubble .th{font-size:clamp(18px,5.2vw,21px);font-weight:500;margin-top:2px}
+.again{font:600 11px var(--th);background:none;border:1px solid var(--line);color:var(--cashier);border-radius:999px;padding:3px 9px;cursor:pointer}
+.hint{font-size:12px;color:var(--muted);margin:0 2px 8px}
+.opts{display:grid;gap:8px}
+.opt{display:block;width:100%;text-align:left;background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--ink);border-radius:14px;padding:10px 14px;cursor:pointer;font-family:var(--th);transition:background .12s,transform .08s}
+.opt:hover{background:rgba(143,211,182,.14);border-color:rgba(143,211,182,.5)} .opt:active{transform:scale(.985)}
+.opt .jp{font-size:17px;font-weight:500;display:block} .opt .ro,.opt .th{display:block;margin-top:1px} .opt .th{font-size:17px}
+body:not(.show-ro) .opt .ro,body:not(.show-th) .opt .th{display:none}
+.opt .k{float:right;font:600 11px var(--th);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-left:8px}
+
+.go{width:100%;border:0;border-radius:14px;padding:13px;background:var(--accent);color:var(--accent-ink);font:700 16px var(--th);cursor:pointer}
+.go.ghost{background:rgba(255,255,255,.1);color:var(--ink);margin-top:8px}
+
+/* start + end */
+.screen{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 18px max(22px,env(safe-area-inset-bottom));
+  background:linear-gradient(rgba(10,11,15,.15),rgba(10,11,15,.95) 55%)}
+.screen[hidden]{display:none}
+.screen h1{font:700 30px var(--jp);margin:0 0 4px} .screen h2{font:500 16px var(--th);color:var(--muted);margin:0 0 14px}
+.screen p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 16px}
+#poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;filter:saturate(.9)}
+#log{max-height:52dvh;overflow:auto;margin-bottom:14px;display:grid;gap:6px}
+#log .row{padding:7px 11px;border-radius:12px;background:rgba(255,255,255,.06);border-left:3px solid var(--cashier)}
+#log .row.customer{border-left-color:var(--customer);background:rgba(255,201,143,.1)}
+#log .jp{font-size:15px} #log .ro,#log .th{display:block} #log .th{font-size:16px}
+#loading{position:absolute;inset:0;display:grid;place-items:center;z-index:3;color:var(--muted);font-size:13px;pointer-events:none}
+</style>
+</head>
+<body class="show-ro show-th">
+<div id="stage">
+  <div id="loading">กำลังโหลดวิดีโอ…</div>
+  <div id="top">
+    <div id="title"></div>
+    <div id="dots"></div>
+    <button class="tog" id="tRo" aria-pressed="true">Romaji</button>
+    <button class="tog" id="tTh" aria-pressed="true">ไทย</button>
+  </div>
+  <div id="sub" style="opacity:0"><div class="card"><div class="who"></div><div class="jp"></div><div class="ro"></div><div class="th"></div></div></div>
+
+  <div class="sheet" id="ask">
+    <div class="bubble"><div class="who"><span>พนักงาน</span><button class="again" id="again">↻ ฟังอีกครั้ง</button></div>
+      <div class="jp" id="qJp"></div><div class="ro" id="qRo"></div><div class="th" id="qTh"></div></div>
+    <div class="hint">เลือกคำตอบของคุณ</div>
+    <div class="opts" id="opts"></div>
+  </div>
+
+  <div class="screen" id="start">
+    <img id="poster" alt="">
+    <h1 id="sTitle"></h1><h2 id="sSub"></h2>
+    <p>พนักงานจะถามทีละคำถาม วิดีโอจะหยุดรอให้คุณเลือกคำตอบ แล้วพนักงานจะทำตามที่คุณตอบ ลองเล่นซ้ำแล้วตอบแบบอื่นดูได้</p>
+    <button class="go" id="goStart">▶ เริ่ม</button>
+  </div>
+  <div class="screen" id="end" hidden>
+    <h1>おつかれさま！</h1><h2>บทสนทนาของคุณ</h2>
+    <div id="log"></div>
+    <button class="go" id="goAgain">↻ เล่นอีกครั้ง (ลองตอบแบบอื่น)</button>
+  </div>
+</div>
+
+<script>
+const sid = window.IA_SID || new URLSearchParams(location.search).get('s') || 'konbini';
+const base = window.IA_BASE ?? (sid + '/');
+if (window.SCENARIOS && window.SCENARIOS[sid]) init(window.SCENARIOS[sid]);   // scenario inlined (published copy)
+else {
+  const s = document.createElement('script');
+  s.src = base + 'scenario.js';
+  s.onload = () => init(window.SCENARIOS[sid]);
+  s.onerror = () => document.getElementById('loading').textContent = 'ไม่พบ ' + base + 'scenario.js';
+  document.head.appendChild(s);
+}
+
+function init(S){
+  const $ = id => document.getElementById(id);
+  const stage = $('stage');
+  const vids = {};            // clip id -> <video>
+  let cur = null, state = {}, log = [], qIndex = 0, subLines = [], subTimer = 0, questionStart = null;
+
+  document.title = S.title + ' · ' + S.title_th;
+  $('title').textContent = S.title + ' · ' + S.title_th;
+  $('sTitle').textContent = S.title; $('sSub').textContent = S.title_th;
+  $('poster').src = base + 'clips/hub.jpg';
+  $('dots').innerHTML = S.questions.map(() => '<i></i>').join('');
+
+  const pref = (k, d) => { try { const v = localStorage.getItem('ia.' + k); return v === null ? d : v === '1'; } catch(e){ return d; } };
+  const setPref = (k, v) => { try { localStorage.setItem('ia.' + k, v ? '1' : '0'); } catch(e){} };
+  function tog(btn, cls, key){
+    const apply = on => { document.body.classList.toggle(cls, on); btn.setAttribute('aria-pressed', on); };
+    apply(pref(key, true));
+    btn.onclick = () => { const on = !document.body.classList.contains(cls); apply(on); setPref(key, on); };
+  }
+  tog($('tRo'), 'show-ro', 'ro'); tog($('tTh'), 'show-th', 'th');
+
+  function video(clip){
+    if (vids[clip]) return vids[clip];
+    const v = document.createElement('video');
+    v.src = base + 'clips/' + clip + '.mp4'; v.preload = 'auto'; v.playsInline = true;
+    v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    stage.insertBefore(v, $('loading'));
+    vids[clip] = v; return v;
+  }
+  const preload = clips => clips.forEach(c => { const v = video(c); if (v.readyState < 2) v.load(); });
+
+  function playClip(clip, lines, onEnd){
+    const v = video(clip);
+    const T = (S.timings && S.timings[clip]) || null;
+    subLines = lines.map((l, i) => Object.assign({}, l, T && T[i] ? {t0:T[i][0], t1:T[i][1]} : spread(lines, i, S.durations[clip])));
+    questionStart = (subLines.find(l => l.question) || {}).t0 ?? null;
+    v.currentTime = 0;
+    const show = () => { Object.values(vids).forEach(x => x.classList.toggle('on', x === v)); if (cur && cur !== v) cur.pause(); cur = v; };
+    v.onended = () => { hideSub(); onEnd && onEnd(); };
+    const p = v.play();
+    $('loading').style.opacity = v.readyState >= 2 ? 0 : 1;
+    v.onplaying = () => { $('loading').style.opacity = 0; show(); };
+    if (p && p.catch) p.catch(() => { show(); });
+    tickSubs();
+  }
+  function spread(lines, i, dur){ const n = lines.length, w = dur / n; return {t0: i*w + .2, t1: (i+1)*w - .1}; }
+  function tickSubs(){
+    cancelAnimationFrame(subTimer);
+    const step = () => {
+      if (!cur) return;
+      const t = cur.currentTime;
+      const l = subLines.find(l => t >= l.t0 && t <= l.t1 + .35);
+      if (l) showSub(l); else hideSub();
+      if (!cur.paused && !cur.ended) subTimer = requestAnimationFrame(step);
+    };
+    subTimer = requestAnimationFrame(step);
+  }
+  let shown = null;
+  function showSub(l){
+    const el = $('sub'); el.style.opacity = 1;
+    if (shown === l) return; shown = l;
+    el.className = l.who;
+    el.querySelector('.who').textContent = l.who === 'customer' ? 'คุณ' : 'พนักงาน';
+    el.querySelector('.jp').textContent = l.jp; el.querySelector('.ro').textContent = l.romaji; el.querySelector('.th').textContent = l.th;
+  }
+  function hideSub(){ $('sub').style.opacity = 0; shown = null; }
+
+  function dots(){ [...$('dots').children].forEach((d, i) => d.className = i < qIndex ? 'done' : i === qIndex ? 'now' : ''); }
+
+  function ask(){
+    const q = S.questions[qIndex]; dots();
+    $('qJp').textContent = q.cashier.jp; $('qRo').textContent = q.cashier.romaji; $('qTh').textContent = q.cashier.th;
+    $('opts').innerHTML = '';
+    q.options.forEach((o, i) => {
+      const b = document.createElement('button'); b.className = 'opt';
+      b.innerHTML = `<span class="k">${i+1}</span><span class="jp"></span><span class="ro"></span><span class="th"></span>`;
+      b.querySelector('.jp').textContent = o.answer.jp; b.querySelector('.ro').textContent = o.answer.romaji; b.querySelector('.th').textContent = o.answer.th;
+      b.onclick = () => choose(q, o);
+      $('opts').appendChild(b);
+    });
+    preload(q.options.map(o => o.clip));
+    $('ask').classList.add('open');
+  }
+  $('again').onclick = () => {
+    if (!cur || questionStart === null) return;
+    $('ask').classList.remove('open');
+    cur.currentTime = Math.max(0, questionStart - .3); cur.play(); tickSubs();
+  };
+
+  function choose(q, o){
+    $('ask').classList.remove('open');
+    log.push({who:'cashier', ...q.cashier});
+    Object.assign(state, o.sets || {});
+    o.lines.filter(l => !l.question).forEach(l => log.push(l));
+    qIndex++;
+    const next = q.next;
+    if (next) preload(S.questions[qIndex].options.map(x => x.clip));
+    else {   // iOS only lets a video play with sound if a tap started it: unlock the ending now, inside this tap
+      preload([endingClip()]);
+      const ev = video(endingClip()), p = ev.play();
+      if (p && p.then) p.then(() => { ev.pause(); ev.currentTime = 0; }).catch(() => {});
+    }
+    playClip(o.clip, o.lines, () => next ? ask() : ending());
+  }
+
+  function endingClip(){ return (state.warm ? S.endings.warm : S.endings.cold).clip; }
+  function ending(){
+    dots();
+    const e = state.warm ? S.endings.warm : S.endings.cold;
+    playClip(e.clip, e.lines, () => { e.lines.forEach(l => log.push(l)); showLog(); });
+  }
+  function showLog(){
+    $('log').innerHTML = '';
+    log.forEach(l => {
+      const r = document.createElement('div'); r.className = 'row ' + l.who;
+      r.innerHTML = '<span class="jp"></span><span class="ro"></span><span class="th"></span>';
+      r.querySelector('.jp').textContent = l.jp; r.querySelector('.ro').textContent = l.romaji; r.querySelector('.th').textContent = l.th;
+      $('log').appendChild(r);
+    });
+    $('end').hidden = false;
+  }
+
+  function begin(){
+    $('start').hidden = true; $('end').hidden = true;
+    state = {}; log = []; qIndex = 0; dots();
+    log.push(...S.intro.lines);
+    preload(S.questions[0].options.map(o => o.clip));
+    playClip(S.intro.clip, S.intro.lines.concat([{who:'cashier', ...S.questions[0].cashier, question:true}]), ask);
+  }
+  video(S.intro.clip);
+  $('goStart').onclick = begin; $('goAgain').onclick = begin;
+
+  document.addEventListener('keydown', e => {
+    if ($('ask').classList.contains('open')) { const b = $('opts').children[+e.key - 1]; if (b) b.click(); }
+  });
+}
+</script>
+</body>
+</html>
