@@ -222,10 +222,15 @@ function init(S){
     playClip(o.clip, o.lines, () => next ? ask() : ending());
   }
 
-  function endingClip(){ return (state.warm ? S.endings.warm : S.endings.cold).clip; }
+  // which ending plays: S.ending_by = {state:'drink', map:{beer:'beer'}, default:'plain'}; konbini predates it (warm/cold)
+  function endingKey(){
+    const r = S.ending_by || {state:'warm', map:{'true':'warm'}, default:'cold'};
+    return (r.map && r.map[String(state[r.state])]) || r.default;
+  }
+  function endingClip(){ return S.endings[endingKey()].clip; }
   function ending(){
     dots();
-    const e = state.warm ? S.endings.warm : S.endings.cold;
+    const e = S.endings[endingKey()];
     playClip(e.clip, e.lines, () => { e.lines.forEach(l => log.push(l)); showLog(); });
   }
   function showLog(){
