@@ -86,7 +86,7 @@ body:not(.show-ro) .opt .ro,body:not(.show-th) .opt .th{display:none}
   <div id="sub" style="opacity:0"><div class="card"><div class="who"></div><div class="jp"></div><div class="ro"></div><div class="th"></div></div></div>
 
   <div class="sheet" id="ask">
-    <div class="bubble"><div class="who"><span>พนักงาน</span><button class="again" id="again">↻ ฟังอีกครั้ง</button></div>
+    <div class="bubble"><div class="who"><span id="staffLbl">พนักงาน</span><button class="again" id="again">↻ ฟังอีกครั้ง</button></div>
       <div class="jp" id="qJp"></div><div class="ro" id="qRo"></div><div class="th" id="qTh"></div></div>
     <div class="hint">เลือกคำตอบของคุณ</div>
     <div class="opts" id="opts"></div>
@@ -95,7 +95,7 @@ body:not(.show-ro) .opt .ro,body:not(.show-th) .opt .th{display:none}
   <div class="screen" id="start">
     <img id="poster" alt="">
     <h1 id="sTitle"></h1><h2 id="sSub"></h2>
-    <p>พนักงานจะถามทีละคำถาม วิดีโอจะหยุดรอให้คุณเลือกคำตอบ แล้วพนักงานจะทำตามที่คุณตอบ ลองเล่นซ้ำแล้วตอบแบบอื่นดูได้</p>
+    <p id="sHow">พนักงานจะถามทีละคำถาม วิดีโอจะหยุดรอให้คุณเลือกคำตอบ แล้วพนักงานจะทำตามที่คุณตอบ ลองเล่นซ้ำแล้วตอบแบบอื่นดูได้</p>
     <button class="go" id="goStart">▶ เริ่ม</button>
   </div>
   <div class="screen" id="end" hidden>
@@ -123,9 +123,12 @@ function init(S){
   const vids = {};            // clip id -> <video>
   let cur = null, state = {}, log = [], qIndex = 0, subLines = [], subTimer = 0, questionStart = null;
 
+  const STAFF = S.staff_th || 'พนักงาน';
   document.title = S.title + ' · ' + S.title_th;
   $('title').textContent = S.title + ' · ' + S.title_th;
   $('sTitle').textContent = S.title; $('sSub').textContent = S.title_th;
+  $('staffLbl').textContent = STAFF;
+  $('sHow').textContent = $('sHow').textContent.split('พนักงาน').join(STAFF);
   $('poster').src = base + 'clips/hub.jpg';
   $('dots').innerHTML = S.questions.map(() => '<i></i>').join('');
 
@@ -179,7 +182,7 @@ function init(S){
     const el = $('sub'); el.style.opacity = 1;
     if (shown === l) return; shown = l;
     el.className = l.who;
-    el.querySelector('.who').textContent = l.who === 'customer' ? 'คุณ' : 'พนักงาน';
+    el.querySelector('.who').textContent = l.who === 'customer' ? 'คุณ' : STAFF;
     el.querySelector('.jp').textContent = l.jp; el.querySelector('.ro').textContent = l.romaji; el.querySelector('.th').textContent = l.th;
   }
   function hideSub(){ $('sub').style.opacity = 0; shown = null; }
